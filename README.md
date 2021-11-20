@@ -4,10 +4,10 @@
 Control your browser using winks while surfing the web 
 
 ### How to run
-**TODO**
+*TODO*
 
 ### Live Demo
-**TODO**
+*TODO*
 
 ### Resources:
 - **Inspiration for calculating winks/blinks:** https://www.pyimagesearch.com/2017/04/24/eye-blink-detection-opencv-python-dlib/

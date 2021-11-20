@@ -4,13 +4,40 @@ import '@tensorflow/tfjs-backend-webgl';
 import './App.css';
 
 const EYE_ASPECT_RATIO_TH = 0.35
-const EYE_AR_CONSEC_FRAMES = 3
+const EYE_AR_CONSEC_FRAMES = 4
+const DEFAULT_SCROLL_BY_PIXELS = 50
+const VIDEO_CONFIGURATION = {
+    width: 250,
+    height: 250
+}
+
+/* TODO:
+
+for each face
+    calculate the eye aspect ratio for each eye
+    if EAR less than TH, it's a blink
+    check if it's a wink (and determine which eye to make sure it's a wink and not a blink by using the EAR
+    value which should be bigger than the TH
+    Interact with the browser upon a wink by the user choice (Can be go back/forward or scrolling down/up in
+    the same page, or get more ideas)
+
+Optional:
+- P0: Add a counter for: blinks, right wink, left wink
+- P0: Fix bugs + add dots on landmarks for debugging
+- P1: Present a winking emoji matching the wink side on the face
+- P2: let the user enable/disable view of video box at the top left
+- P2: Add animations
+- P2: create a chrome extension from it
+ */
 
 const App = () => {
     const [model, setModel] = useState(null);
     const [isModelLoaded, setIsModelLoaded] = useState(false);
+    // TODO: Add input component for changing this value
+    const [scrollBy, setScrollBy] = useState(DEFAULT_SCROLL_BY_PIXELS);
     const videoRef = useRef(null)
     const streamRef = useRef(null)
+    const winkCounterRef = useRef(0);
     const currentYScrollPosition = useRef(0)
 
     const calculateEyeAspectRatio = (lowerEye, upperEye) => {
@@ -19,6 +46,13 @@ const App = () => {
 
         const c = calculateDistance(upperEye[0], upperEye[upperEye.length - 1]);
         return (a + b) / (2.0 * c);
+    }
+
+    const listenToScroll = () => {
+        window.addEventListener('scroll', () => {
+            currentYScrollPosition.current = window.scrollY
+            console.log(currentYScrollPosition.current);
+        })
     }
 
     const calculateDistance = (point1, point2) => Math.hypot(point2[0] - point1[0], point2[1] - point1[1])
@@ -31,27 +65,9 @@ const App = () => {
     }
 
     useEffect(async () => {
-        console.log('in useEffect', isModelLoaded);
+        listenToScroll();
         await setupCamera();
         await loadModel();
-        /* TODO:
-
-        for each face
-            calculate the eye aspect ratio for each eye
-            if it's less than TH, it's a blink
-            check if it's a wink (and determine which eye to make sure it's a wink and not a blink by using the EAR
-            value which should be bigger than the TH
-            Interact with the browser upon a wink by the user choice (Can be go back/forward or scrolling down/up in
-            the same page, or get more ideas)
-
-        Optional:
-        - let the user enable video frame presented at the top left
-        - create a chrome extension from it
-        - Add a counter for: blinks, right wink, left wink
-        - Add animations
-        - Present a winking emoji matching the wink side on the face
-         */
-
         return (() => {
             streamRef.current.stop()
         })
@@ -59,18 +75,36 @@ const App = () => {
 
     const setupCamera = async () => {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: 200,
-                height: 200
-            }
+            video: VIDEO_CONFIGURATION
         })
-        if (videoRef) {
+        if (videoRef.current) {
             videoRef.current.srcObject = streamRef.current
         }
     }
 
+    const isDesiredWink = (primaryEyeRatio, secondaryEyeRatio) => primaryEyeRatio <= EYE_ASPECT_RATIO_TH && secondaryEyeRatio > EYE_ASPECT_RATIO_TH
+
+    const scrollOnWinkAction = (pixelsToScroll) => {
+        window.scroll({
+            top: currentYScrollPosition.current + pixelsToScroll,
+            behavior: 'smooth'
+        });
+    }
+
+    const isVoluntaryWink = () => {
+        if (winkCounterRef.current < EYE_AR_CONSEC_FRAMES) {
+            winkCounterRef.current += 1
+            return
+        }
+        winkCounterRef.current = 0
+    }
+    const handleWink = onWinkAction => {
+        isVoluntaryWink()
+        onWinkAction()
+    }
+
     const detectWinks = async () => {
-        const predictions = videoRef.current && await model.estimateFaces({
+        const predictions = model && videoRef.current && await model.estimateFaces({
             input: videoRef.current
         });
         predictions.forEach(({ annotations }) => {
@@ -78,44 +112,17 @@ const App = () => {
             const leftEyeAspectRatio = calculateEyeAspectRatio(leftEyeLower0, leftEyeUpper0)
             const rightEyeAspectRatio = calculateEyeAspectRatio(rightEyeLower0, rightEyeUpper0)
 
-            if (leftEyeAspectRatio <= EYE_ASPECT_RATIO_TH && rightEyeAspectRatio > EYE_ASPECT_RATIO_TH) {
-                console.log('LEFT eye wink!')
-                currentYScrollPosition.current -= 25
-                window.scroll({
-                    top: currentYScrollPosition.current,
-                    behavior: 'smooth'
-                });
-            }
-            if (rightEyeAspectRatio <= EYE_ASPECT_RATIO_TH && leftEyeAspectRatio > EYE_ASPECT_RATIO_TH) {
-                console.log('RIGHT eye wink!')
-                currentYScrollPosition.current += 25
-                window.scroll({
-                    top: currentYScrollPosition.current,
-                    behavior: 'smooth'
-                });
-            }
-            // console.log('leftEyeAspectRatio', leftEyeAspectRatio);
-            // console.log('rightEyeAspectRatio', rightEyeAspectRatio);
+            // Left Eye Wink
+            if (isDesiredWink(leftEyeAspectRatio, rightEyeAspectRatio)) handleWink(() => scrollOnWinkAction(-scrollBy))
+            // Right Eye Wink
+            if (isDesiredWink(rightEyeAspectRatio, leftEyeAspectRatio)) handleWink(() => scrollOnWinkAction(scrollBy))
         })
         requestAnimationFrame(detectWinks)
     }
 
     return (
         <div className="App">
-            {!isModelLoaded && 'Loading model'}
             <p>
-                Edit <code>src/App.js</code> and save to reload.
-            </p>
-            <a
-                className="App-link"
-                href="https://reactjs.org"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                Learn React
-            </a>
-            <p>
-
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras auctor sodales tempus. Sed ante
                 libero, scelerisque a pulvinar non, mattis eu nibh. Donec bibendum euismod lorem quis laoreet.
                 Aenean elit leo, pretium vel condimentum quis, porta vel lorem. Suspendisse cursus ante sed

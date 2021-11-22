@@ -15,6 +15,8 @@ Control your browser using winks while surfing the web
 - [ ] P2: create a chrome extension with those capabilities
 - [ ] P2: Add back/forward actions
 
+For more suggestions your'e more than welcome to contact me or open an issue
+
 ### How to run locally
 In your terminal run the commands below:
 

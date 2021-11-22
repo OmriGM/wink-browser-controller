@@ -4,35 +4,13 @@ import '@tensorflow/tfjs-backend-webgl';
 import './App.css';
 
 const EYE_ASPECT_RATIO_TH = 0.35
-const EYE_AR_CONSEC_FRAMES = 4
-const DEFAULT_SCROLL_BY_PIXELS = 50
-const VIDEO_CONFIGURATION = {
-    width: 250,
-    height: 250
-}
-
-/* TODO:
-
-for each face
-    calculate the eye aspect ratio for each eye
-    if EAR less than TH, it's a blink
-    check if it's a wink (and determine which eye to make sure it's a wink and not a blink by using the EAR
-    value which should be bigger than the TH
-    Interact with the browser upon a wink by the user choice (Can be go back/forward or scrolling down/up in
-    the same page, or get more ideas)
-
-Optional:
-- P0: Add a counter for: blinks, right wink, left wink
-- P0: Fix bugs + add dots on landmarks for debugging
-- P1: Present a winking emoji matching the wink side on the face
-- P2: let the user enable/disable view of video box at the top left
-- P2: Add animations
-- P2: create a chrome extension from it
- */
+const EYE_AR_CONSECUTIVE_FRAMES = 4
+const DEFAULT_SCROLL_BY_PIXELS = 55
+const VIDEO_HEIGHT = 250
+const VIDEO_WIDTH = 250
 
 const App = () => {
     const [model, setModel] = useState(null);
-    const [isModelLoaded, setIsModelLoaded] = useState(false);
     // TODO: Add input component for changing this value
     const [scrollBy, setScrollBy] = useState(DEFAULT_SCROLL_BY_PIXELS);
     const videoRef = useRef(null)
@@ -40,51 +18,53 @@ const App = () => {
     const winkCounterRef = useRef(0);
     const currentYScrollPosition = useRef(0)
 
-    const calculateEyeAspectRatio = (lowerEye, upperEye) => {
-        const a = calculateDistance(upperEye[4], lowerEye[3]);
-        const b = calculateDistance(upperEye[5], lowerEye[4]);
-
-        const c = calculateDistance(upperEye[0], upperEye[upperEye.length - 1]);
-        return (a + b) / (2.0 * c);
-    }
-
-    const listenToScroll = () => {
-        window.addEventListener('scroll', () => {
-            currentYScrollPosition.current = window.scrollY
-            console.log(currentYScrollPosition.current);
-        })
-    }
-
-    const calculateDistance = (point1, point2) => Math.hypot(point2[0] - point1[0], point2[1] - point1[1])
-
-    const loadModel = async () => {
-        const faceModel = await faceLandmarksDetection.load(
-            faceLandmarksDetection.SupportedPackages.mediapipeFacemesh);
-        setIsModelLoaded(true);
-        setModel(faceModel);
-    }
-
     useEffect(async () => {
-        listenToScroll();
+        listenToWindowScroll();
         await setupCamera();
         await loadModel();
         return (() => {
             streamRef.current.stop()
+            window.removeEventListener('scroll', () => currentYScrollPosition.current = window.scrollY)
         })
     }, []);
 
+    // TODO: Export to utils and describe the function
+    const calculateEyeAspectRatio = (lowerEye, upperEye) => {
+        const a = calculateDistance(upperEye[4], lowerEye[3]);
+        const b = calculateDistance(upperEye[5], lowerEye[4]);
+        const c = calculateDistance(upperEye[0], upperEye[upperEye.length - 1]);
+
+        return (a + b) / (2.0 * c);
+    }
+
+    // TODO: Export to utils and describe the function
+    const calculateDistance = (point1, point2) => Math.hypot(point2[0] - point1[0], point2[1] - point1[1])
+
+    const listenToWindowScroll = () => {
+        window.addEventListener('scroll', () => currentYScrollPosition.current = window.scrollY)
+    }
+
+    const loadModel = async () => {
+        const faceModel = await faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh)
+        setModel(faceModel);
+    }
+
     const setupCamera = async () => {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
-            video: VIDEO_CONFIGURATION
+            video: {
+                width: VIDEO_WIDTH,
+                height: VIDEO_HEIGHT
+            }
         })
         if (videoRef.current) {
             videoRef.current.srcObject = streamRef.current
         }
     }
 
-    const isDesiredWink = (primaryEyeRatio, secondaryEyeRatio) => primaryEyeRatio <= EYE_ASPECT_RATIO_TH && secondaryEyeRatio > EYE_ASPECT_RATIO_TH
+    const isDesiredWinkingEye = (primaryEyeRatio, secondaryEyeRatio) =>
+        primaryEyeRatio <= EYE_ASPECT_RATIO_TH && secondaryEyeRatio > EYE_ASPECT_RATIO_TH
 
-    const scrollOnWinkAction = (pixelsToScroll) => {
+    const scrollOnWinkAction = pixelsToScroll => {
         window.scroll({
             top: currentYScrollPosition.current + pixelsToScroll,
             behavior: 'smooth'
@@ -92,31 +72,40 @@ const App = () => {
     }
 
     const isVoluntaryWink = () => {
-        if (winkCounterRef.current < EYE_AR_CONSEC_FRAMES) {
+        if (winkCounterRef.current < EYE_AR_CONSECUTIVE_FRAMES) {
             winkCounterRef.current += 1
-            return
+            return false
         }
         winkCounterRef.current = 0
+        return true
     }
+
     const handleWink = onWinkAction => {
-        isVoluntaryWink()
-        onWinkAction()
+        isVoluntaryWink() && onWinkAction()
+    }
+
+    const processEyesLandmarks = (leftEyeUpper0, leftEyeLower0, rightEyeUpper0, rightEyeLower0) => {
+        const leftEyeAspectRatio = calculateEyeAspectRatio(leftEyeLower0, leftEyeUpper0)
+        const rightEyeAspectRatio = calculateEyeAspectRatio(rightEyeLower0, rightEyeUpper0)
+
+        const isLeftEyeWink = isDesiredWinkingEye(leftEyeAspectRatio, rightEyeAspectRatio)
+        const isRightEyeWink = isDesiredWinkingEye(rightEyeAspectRatio, leftEyeAspectRatio)
+
+        isLeftEyeWink && handleWink(() => scrollOnWinkAction(-scrollBy))
+        isRightEyeWink && handleWink(() => scrollOnWinkAction(scrollBy))
     }
 
     const detectWinks = async () => {
         const predictions = model && videoRef.current && await model.estimateFaces({
-            input: videoRef.current
+            input: videoRef.current,
+            predictIrises: false
         });
+
         predictions.forEach(({ annotations }) => {
             const { leftEyeUpper0, leftEyeLower0, rightEyeUpper0, rightEyeLower0 } = annotations
-            const leftEyeAspectRatio = calculateEyeAspectRatio(leftEyeLower0, leftEyeUpper0)
-            const rightEyeAspectRatio = calculateEyeAspectRatio(rightEyeLower0, rightEyeUpper0)
-
-            // Left Eye Wink
-            if (isDesiredWink(leftEyeAspectRatio, rightEyeAspectRatio)) handleWink(() => scrollOnWinkAction(-scrollBy))
-            // Right Eye Wink
-            if (isDesiredWink(rightEyeAspectRatio, leftEyeAspectRatio)) handleWink(() => scrollOnWinkAction(scrollBy))
+            processEyesLandmarks(leftEyeUpper0, leftEyeLower0, rightEyeUpper0, rightEyeLower0)
         })
+
         requestAnimationFrame(detectWinks)
     }
 
@@ -226,8 +215,8 @@ const App = () => {
                 playsInline
                 autoPlay
                 muted
-                width={150}
-                height={150}
+                width={VIDEO_WIDTH}
+                height={VIDEO_HEIGHT}
                 className={'stream-video'}
                 onLoadedData={detectWinks}
             />

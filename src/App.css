@@ -13,11 +13,16 @@
   }
 }
 
-#stream-video {
+.stream-video {
     /*visibility: hidden;*/
     position: fixed;
     top: 10px;
     left: 10px;
+}
+
+.wink-emoji {
+  width: 80px;
+  height: 80px;
 }
 
 .App {

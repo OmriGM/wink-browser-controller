@@ -9,8 +9,8 @@ Control your browser using winks while surfing the web
 ### Roadmap
 - [ ] P0: Add a counter for: Winks (Right and Left separation) and Blinks.
 - [ ] P0: Fix bugs + add landmarks dots on the video for debugging (Use canvas/SVGs)
-- [ ] P1: Show a winking emoji matching user's current winking eye
-- [ ] P2: Let the user show/hide the video box
+- [x] P1: Show a winking emoji matching user's current winking eye
+- [x] P2: Let the user show/hide the video box
 - [ ] P2: Add animations
 - [ ] P2: create a chrome extension with those capabilities
 - [ ] P2: Add back/forward actions

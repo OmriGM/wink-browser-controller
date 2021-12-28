@@ -25,11 +25,11 @@ const winkBoxMode = Object.freeze({
 
 
 const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
-    const [privateMode, setPrivateMode] = useState(true); // Add more modes like camera, emoji, or nothing
+    const [privateMode, setPrivateMode] = useState(true);
     const [latestWinkSide, setLatestWinkSide] = useState(null);
     const [model, setModel] = useState(null);
-    const videoRef = useRef(null)
-    const streamRef = useRef(null)
+    const videoRef = useRef(null);
+    const streamRef = useRef(null);
     const winkCounterRef = useRef(0);
 
     useEffect(async () => {
@@ -46,7 +46,6 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
     }
 
     const setupCamera = async () => {
-        console.log(navigator.mediaDevices);
         if (!navigator.mediaDevices) {
             alert('User media was not found, please turn it on')
         }
@@ -61,7 +60,20 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
         }
     }
 
-    const processEyesLandmarks = (leftEyeUpper0, leftEyeLower0, rightEyeUpper0, rightEyeLower0) => {
+    const isVoluntaryWink = winkSide => {
+        if (winkCounterRef.current < EYE_AR_CONSECUTIVE_FRAMES && winkSide === latestWinkSide) {
+            winkCounterRef.current += 1
+            return false
+        }
+
+        winkCounterRef.current = 0
+        return true
+    }
+
+    const isDesiredWinkingEye = (primaryEyeRatio, secondaryEyeRatio) =>
+        primaryEyeRatio <= EYE_ASPECT_RATIO_TH && secondaryEyeRatio > EYE_ASPECT_RATIO_TH
+
+    const processEyesLandmarks = ({ leftEyeUpper0, leftEyeLower0, rightEyeUpper0, rightEyeLower0 }) => {
         const leftEyeAspectRatio = calculateEyeAspectRatio({ lower: leftEyeLower0, upper: leftEyeUpper0 })
         const rightEyeAspectRatio = calculateEyeAspectRatio({ lower: rightEyeLower0, upper: rightEyeUpper0 })
         // console.log(leftEyeAspectRatio, 'leftEyeAspectRatio');
@@ -73,30 +85,18 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
             onLeftWinkAction()
             setLatestWinkSide(winkSide.left)
         }
+
         if (isRightEyeWink && isVoluntaryWink(winkSide.right)) {
             onRightWinkAction()
             setLatestWinkSide(winkSide.right)
         }
     }
 
-    const isVoluntaryWink = winkSide => {
-        if (winkCounterRef.current < EYE_AR_CONSECUTIVE_FRAMES && winkSide === latestWinkSide) {
-            winkCounterRef.current += 1
-            return false
-        }
-        winkCounterRef.current = 0
-        return true
-    }
-
-    const isDesiredWinkingEye = (primaryEyeRatio, secondaryEyeRatio) =>
-        primaryEyeRatio <= EYE_ASPECT_RATIO_TH && secondaryEyeRatio > EYE_ASPECT_RATIO_TH
-
     const detectWinks = async () => {
         const predictions = model && videoRef.current && await model.estimateFaces({ input: videoRef.current });
         if (predictions && predictions.length) {
             predictions.forEach(({ annotations }) => {
-                const { leftEyeUpper0, leftEyeLower0, rightEyeUpper0, rightEyeLower0 } = annotations
-                processEyesLandmarks(leftEyeUpper0, leftEyeLower0, rightEyeUpper0, rightEyeLower0)
+                processEyesLandmarks(annotations)
             })
         }
         requestAnimationFrame(detectWinks)
@@ -130,8 +130,7 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
                 <Switch className={'media-switch'} onChange={() => setPrivateMode(!privateMode)}/>
             </div>
             <div className={'media-container'}>
-                {privateMode && renderWinkEmoji()}
-                {!privateMode && renderVideo()}
+                {privateMode ? renderWinkEmoji() : renderVideo()}
             </div>
         </div>
     );

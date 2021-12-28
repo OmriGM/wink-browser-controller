@@ -6,7 +6,6 @@ import './App.css';
 const DEFAULT_SCROLL_BY_PIXELS = 120
 
 const App = () => {
-    // TODO: Add input component for changing this value
     // TODO: Drop down with choosing the action (window back/forward)
     const [scrollBy, setScrollBy] = useState(DEFAULT_SCROLL_BY_PIXELS);
     const currentYScrollPosition = useRef(0)

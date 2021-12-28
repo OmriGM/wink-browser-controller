@@ -1,16 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 import '@tensorflow/tfjs-backend-webgl';
-
+import { Switch } from 'antd';
 import { calculateEyeAspectRatio } from '../../utils/math'
-
 import rightWinkEmoji from './../../assets/right_wink_emoji.png'
 import leftWinkEmoji from './../../assets/left_wink_emoji.png'
 import './WinkBoxController.scss'
 
-const EYE_ASPECT_RATIO_TH = 0.22
+const EYE_ASPECT_RATIO_TH = 0.24
 const EYE_AR_CONSECUTIVE_FRAMES = 5
-
 const VIDEO_HEIGHT = 250
 const VIDEO_WIDTH = 250
 
@@ -27,7 +25,7 @@ const winkBoxMode = Object.freeze({
 
 
 const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
-    const [privateMode, setPrivateMode] = useState(''); // Add more modes like camera, emoji, or nothing
+    const [privateMode, setPrivateMode] = useState(true); // Add more modes like camera, emoji, or nothing
     const [latestWinkSide, setLatestWinkSide] = useState(null);
     const [model, setModel] = useState(null);
     const videoRef = useRef(null)
@@ -48,6 +46,10 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
     }
 
     const setupCamera = async () => {
+        console.log(navigator.mediaDevices);
+        if (!navigator.mediaDevices) {
+            alert('User media was not found, please turn it on')
+        }
         streamRef.current = await navigator.mediaDevices.getUserMedia({
             video: {
                 width: VIDEO_WIDTH,
@@ -101,33 +103,36 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
     }
 
 
+    const renderWinkEmoji = () => (
+        <img
+            src={latestWinkSide === winkSide.right ? rightWinkEmoji : leftWinkEmoji}
+            alt={'wink_emoji'}
+            className={'wink-emoji'}
+        />
+    )
+
+    const renderVideo = () => (
+        <video
+            style={{ 'visibility': privateMode === winkBoxMode.visible ? 'visible' : 'hidden' }}
+            ref={videoRef}
+            id={'wink-box-controller'}
+            autoPlay
+            muted
+            width={VIDEO_WIDTH}
+            height={VIDEO_HEIGHT}
+            onLoadedData={detectWinks}
+        />
+    )
+
     return (
-        <div className={'stream-video'}>
-            <div>
-                <button onClick={() => setPrivateMode(winkBoxMode.hidden)}>No Show</button>
-                <button onClick={() => setPrivateMode(winkBoxMode.cartoon)}>Anonymous</button>
-                <button onClick={() => setPrivateMode(winkBoxMode.visible)}>I'm OK with it</button>
-                {
-                    privateMode === winkBoxMode.cartoon && (
-                        <img
-                            src={latestWinkSide === winkSide.right ? rightWinkEmoji : leftWinkEmoji}
-                            alt={'wink_emoji'}
-                            className={'wink-emoji'}
-                        />
-                    )
-                }
+        <div className={'wink-box-controller'}>
+            <div className={'media-switch-container'}>
+                <Switch className={'media-switch'} onChange={() => setPrivateMode(!privateMode)}/>
             </div>
-            <video
-                style={{ 'visibility': privateMode === winkBoxMode.visible ? 'visible' : 'hidden' }}
-                ref={videoRef}
-                id={'stream-video'}
-                playsinline
-                autoPlay
-                muted
-                width={VIDEO_WIDTH}
-                height={VIDEO_HEIGHT}
-                onLoadedData={detectWinks}
-            />
+            <div className={'media-container'}>
+                {privateMode && renderWinkEmoji()}
+                {!privateMode && renderVideo()}
+            </div>
         </div>
     );
 };

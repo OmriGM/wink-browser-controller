@@ -7,10 +7,10 @@ import rightWinkEmoji from './../../assets/right_wink_emoji.png'
 import leftWinkEmoji from './../../assets/left_wink_emoji.png'
 import './WinkBoxController.scss'
 
-const EYE_ASPECT_RATIO_TH = 0.24
+const EYE_ASPECT_RATIO_TH = 0.25
 const EYE_AR_CONSECUTIVE_FRAMES = 5
-const VIDEO_HEIGHT = 250
-const VIDEO_WIDTH = 250
+const VIDEO_HEIGHT = 0
+const VIDEO_WIDTH = 0
 
 const winkSide = Object.freeze({
     right: 'right',
@@ -113,7 +113,7 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
 
     const renderVideo = () => (
         <video
-            style={{ 'visibility': privateMode === winkBoxMode.visible ? 'visible' : 'hidden' }}
+            style={{ 'visibility': privateMode ? 'hidden' : 'hidden'}}
             ref={videoRef}
             id={'wink-box-controller'}
             autoPlay
@@ -126,11 +126,12 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
 
     return (
         <div className={'wink-box-controller'}>
-            <div className={'media-switch-container'}>
-                <Switch className={'media-switch'} onChange={() => setPrivateMode(!privateMode)}/>
-            </div>
+            {/*<div className={'media-switch-container'}>*/}
+                {/*<Switch className={'media-switch'} onChange={() => setPrivateMode(!privateMode)}/>*/}
+            {/*</div>*/}
             <div className={'media-container'}>
-                {privateMode ? renderWinkEmoji() : renderVideo()}
+                {privateMode && renderWinkEmoji()}
+                {renderVideo()}
             </div>
         </div>
     );

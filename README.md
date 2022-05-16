@@ -3,6 +3,8 @@
 ## Overview
 Control your browser using winks while surfing the web 
 
+![](https://media.giphy.com/media/Dwir9iYfVSTDJ5igJH/giphy.gif)
+
 ### Live Demo
 [Click Here](https://wink-browser-controller.herokuapp.com)
 

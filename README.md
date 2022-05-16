@@ -1,9 +1,10 @@
 # [WIP] Wink Browser Controller :wink:
 
 ## Overview
-Control your browser using winks while surfing the web 
-
-![](https://media.giphy.com/media/Dwir9iYfVSTDJ5igJH/giphy.gif)
+<p align='center'><b> Control your browser using winks while surfing the web</b></p>
+<p align='center'>
+  <img src='https://media.giphy.com/media/Dwir9iYfVSTDJ5igJH/giphy.gif'/>
+</p>
 
 ### Live Demo
 [Click Here](https://wink-browser-controller.herokuapp.com)

@@ -8,6 +8,10 @@
   border-radius: 3%;
   background: rgb(1, 13, 100, 0.4);
 
+  &.disabled {
+    background: gray;
+  }
+
   .media-switch-container {
     width: 100%;
     display: flex;

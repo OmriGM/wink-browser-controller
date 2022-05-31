@@ -7,8 +7,7 @@ Control your browser using winks while surfing the web
 [Click Here](https://wink-browser-controller.herokuapp.com)
 
 ### Roadmap
-- [ ] P0: Add a counter for: Winks (Right and Left separation) and Blinks.
-- [ ] P0: Fix bugs + add landmarks dots on the video for debugging (Use canvas/SVGs)
+- [ ] P0: Add winks counter.
 - [x] P0: Show a winking emoji matching user's current winking eye
 - [x] P1: Let the user show/hide the video box
 - [ ] P2: Add animations

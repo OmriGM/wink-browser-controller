@@ -1,12 +1,12 @@
 # [WIP] Wink Browser Controller :wink:
 
 ## Overview
-<p align='center'><b> Control your browser using winks while surfing the web</b></p>
+<p align='center'><b> Open your camera and scroll up or down, hands-free, by winking! </b></p>
 <p align='center'>
   <img src='https://media.giphy.com/media/Dwir9iYfVSTDJ5igJH/giphy.gif'/>
 </p>
 
-### Live Demo
+### Live Demo - (A webcam is a must) 
 [Click Here](https://wink-browser-controller.herokuapp.com)
 
 ### Roadmap

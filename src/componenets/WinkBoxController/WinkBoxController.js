@@ -1,16 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection';
 import '@tensorflow/tfjs-backend-webgl';
+import '@tensorflow/tfjs-core';
 import { calculateEyeAspectRatio } from '../../utils/math'
 import rightWinkEmoji from './../../assets/right_wink_emoji.png'
 import leftWinkEmoji from './../../assets/left_wink_emoji.png'
 import './WinkBoxController.scss'
 import Loader from "../Loader/Loader";
 
-const EYE_ASPECT_RATIO_TH = 0.22;
-const EYE_AR_CONSECUTIVE_FRAMES = 8;
-const VIDEO_HEIGHT = 30;
-const VIDEO_WIDTH = 30;
+const EYE_ASPECT_RATIO_TH = 0.24;
+const EYE_AR_CONSECUTIVE_FRAMES = 3;
+const VIDEO_HEIGHT = 0;
+const VIDEO_WIDTH = 0;
+const FPS = 30
 
 
 const winkSide = Object.freeze({
@@ -18,15 +20,26 @@ const winkSide = Object.freeze({
     left: 'left',
 });
 
-const winkBoxMode = Object.freeze({
-    visible: 'visible',
-    cartoon: 'cartoon',
-    hidden: 'hidden',
+const landmarksIndexes = Object.freeze({
+    left: {
+        edgeL: 362,
+        edgeR: 263,
+        upperL: 385,
+        upperR: 386,
+        lowerL: 380,
+        lowerR: 374
+    },
+    right: {
+        edgeL: 33,
+        edgeR: 133,
+        upperL: 159,
+        upperR: 158,
+        lowerL: 145,
+        lowerR: 153,
+    }
 });
 
-
 const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
-    const [privateMode, setPrivateMode] = useState(true);
     const [latestWinkSide, setLatestWinkSide] = useState(null);
     const [detector, setDetector] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -34,47 +47,53 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
     const streamRef = useRef(null);
     const winkCounterRef = useRef(0);
 
-    useEffect(async () => {
-        await loadDetector();
-        await setupCamera();
+    // Set up camera
+    useEffect(() => {
+        const setupCamera = async () => {
+            if (!navigator.mediaDevices) {
+                alert('User media was not found, please turn it on')
+            }
+            const videoConfig = {
+                video: {
+                    facingMode: 'user',
+                    width: VIDEO_WIDTH,
+                    height: VIDEO_HEIGHT,
+                    frameRate: {
+                        ideal: FPS,
+                        max: FPS,
+                    },
+                },
+            }
+
+            streamRef.current = await navigator.mediaDevices.getUserMedia(videoConfig);
+
+            if (videoRef.current) {
+                videoRef.current.srcObject = streamRef.current
+            }
+        };
+        setupCamera();
         return (() => {
             streamRef.current.stop()
         })
+    }, [])
+
+    // Load face landmarks detector
+    useEffect(() => {
+        const loadDetector = async () => {
+            const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
+            const detectorConfig = {
+                runtime: 'mediapipe',
+                refineLandmarks: true,
+                solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
+            };
+            const detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
+            console.log('detector', detector)
+            setDetector(detector);
+        };
+        loadDetector();
     }, []);
 
-    const loadDetector = async () => {
-        const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
-        const detectorConfig = {
-            runtime: 'tfjs', // or 'tfjs'
-            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
-        };
-        const detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
-        console.log('detector', detector)
-        setDetector(detector);
-    };
-
-    const setupCamera = async () => {
-        if (!navigator.mediaDevices) {
-            alert('User media was not found, please turn it on')
-        }
-        const videoConfig = {
-            video: {
-                facingMode: 'user',
-                width: VIDEO_WIDTH,
-                height: VIDEO_HEIGHT,
-                frameRate: {
-                    ideal: 30,
-                },
-            },
-        }
-
-        streamRef.current = await navigator.mediaDevices.getUserMedia(videoConfig);
-
-        if (videoRef.current) {
-            videoRef.current.srcObject = streamRef.current
-        }
-    };
-
+    // Make sure it's not a random blink
     const isVoluntaryWink = winkSide => {
         if (winkCounterRef.current < EYE_AR_CONSECUTIVE_FRAMES && winkSide === latestWinkSide) {
             winkCounterRef.current += 1;
@@ -85,45 +104,39 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
         return true
     };
 
-    const isDesiredWinkingEye = (primaryEyeRatio, secondaryEyeRatio) =>
-        primaryEyeRatio <= EYE_ASPECT_RATIO_TH && secondaryEyeRatio > EYE_ASPECT_RATIO_TH;
+    // Make sure only one eye is winking
+    const isDesiredWinkingEye = ({ primaryEAR, secondaryEAR }) =>
+        primaryEAR <= EYE_ASPECT_RATIO_TH && secondaryEAR > EYE_ASPECT_RATIO_TH;
 
-
-    const landmarksIndexes = Object.freeze({
-        rightEyeEdgeL: 33,
-        rightEyeEdgeR: 133,
-        rightEyeUpperL: 160,
-        rightEyeUpperR: 158,
-        rightEyeLowerL: 144,
-        rightEyeLowerR: 153,
-        leftEyeEdgeL: 362,
-        leftEyeEdgeR: 263,
-        leftEyeUpperL: 385,
-        leftEyeUpperR: 387,
-        leftEyeLowerL: 380,
-        leftEyeLowerR: 373,
-    });
 
     const processEyesLandmarks = (keypoints) => {
         const leftEyeAspectRatio = calculateEyeAspectRatio({
-            edgeR: keypoints[landmarksIndexes.leftEyeEdgeR],
-            edgeL: keypoints[landmarksIndexes.leftEyeEdgeL],
-            upperR: keypoints[landmarksIndexes.leftEyeUpperR],
-            upperL: keypoints[landmarksIndexes.leftEyeUpperL],
-            lowerR: keypoints[landmarksIndexes.leftEyeLowerR],
-            lowerL: keypoints[landmarksIndexes.leftEyeLowerL],
+            edgeL: keypoints[landmarksIndexes.left.edgeL],
+            edgeR: keypoints[landmarksIndexes.left.edgeR],
+            upperL: keypoints[landmarksIndexes.left.upperL],
+            upperR: keypoints[landmarksIndexes.left.upperR],
+            lowerL: keypoints[landmarksIndexes.left.lowerL],
+            lowerR: keypoints[landmarksIndexes.left.lowerR],
         });
         const rightEyeAspectRatio = calculateEyeAspectRatio({
-            edgeR: keypoints[landmarksIndexes.rightEyeEdgeR],
-            edgeL: keypoints[landmarksIndexes.rightEyeEdgeL],
-            upperR: keypoints[landmarksIndexes.rightEyeUpperR],
-            upperL: keypoints[landmarksIndexes.rightEyeUpperL],
-            lowerR: keypoints[landmarksIndexes.rightEyeLowerR],
-            lowerL: keypoints[landmarksIndexes.rightEyeLowerL],
+            edgeL: keypoints[landmarksIndexes.right.edgeL],
+            edgeR: keypoints[landmarksIndexes.right.edgeR],
+            upperL: keypoints[landmarksIndexes.right.upperL],
+            upperR: keypoints[landmarksIndexes.right.upperR],
+            lowerL: keypoints[landmarksIndexes.right.lowerL],
+            lowerR: keypoints[landmarksIndexes.right.lowerR],
         });
+        // console.log('right:', rightEyeAspectRatio);
+        // console.log('left:', leftEyeAspectRatio);
 
-        const isLeftEyeWink = isDesiredWinkingEye(leftEyeAspectRatio, rightEyeAspectRatio);
-        const isRightEyeWink = isDesiredWinkingEye(rightEyeAspectRatio, leftEyeAspectRatio);
+        const isLeftEyeWink = isDesiredWinkingEye({
+            primaryEAR: leftEyeAspectRatio,
+            secondaryEAR: rightEyeAspectRatio
+        });
+        const isRightEyeWink = isDesiredWinkingEye({
+            primaryEAR: rightEyeAspectRatio,
+            secondaryEAR: leftEyeAspectRatio
+        });
 
         if (isLeftEyeWink && isVoluntaryWink(winkSide.left)) {
             onLeftWinkAction();
@@ -138,11 +151,9 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
 
     const detectWinks = async () => {
         const predictions = videoRef.current && await detector.estimateFaces(videoRef.current);
-        // console.log('model', model);
-        // console.log('videoRef.current', videoRef.current);
+        setIsLoading(false);
+        // console.log(predictions);
         if (predictions && predictions.length) {
-            console.log(predictions);
-            setIsLoading(false);
             predictions.forEach(({ keypoints }) => {
                 processEyesLandmarks(keypoints)
             })
@@ -161,24 +172,19 @@ const WinkBoxController = ({ onLeftWinkAction, onRightWinkAction }) => {
 
     const renderVideo = () => (
         <video
-            style={{ 'visibility': privateMode ? 'hidden' : 'hidden'}}
             ref={videoRef}
             id={'wink-box-controller'}
             autoPlay
             muted
-            width={10}
-            height={10}
-            onLoadedData={detectWinks}
+            width={VIDEO_WIDTH}
+            height={VIDEO_HEIGHT}
+            onLoadedData={() => requestAnimationFrame(detectWinks)}
         />
     );
 
     return (
         <div className={'wink-box-controller'}>
-            {/*<div className={'media-switch-container'}>*/}
-                {/*<Switch className={'media-switch'} onChange={() => setPrivateMode(!privateMode)}/>*/}
-            {/*</div>*/}
             <div className={'media-container'}>
-                {/*{privateMode && renderWinkEmoji()}*/}
                 {isLoading ? <Loader/> : renderWinkEmoji()}
                 {renderVideo()}
             </div>

@@ -1,5 +1,4 @@
-import React, { useRef } from 'react'
-import { useState, useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import WinkBoxController from './componenets/WinkBoxController/WinkBoxController'
 import './App.css';
 
@@ -7,7 +6,7 @@ const DEFAULT_SCROLL_BY_PIXELS = 120
 
 const App = () => {
     // TODO: Drop down with choosing the action (window back/forward)
-    const [scrollBy, setScrollBy] = useState(DEFAULT_SCROLL_BY_PIXELS);
+    const [scrollByPixelsCount, setScrollByPixelsCount] = useState(DEFAULT_SCROLL_BY_PIXELS);
     const currentYScrollPosition = useRef(0)
 
     useEffect(() => {
@@ -31,8 +30,8 @@ const App = () => {
     return (
         <div className="App">
             <WinkBoxController
-                onRightWinkAction={() => scrollOnWinkAction(DEFAULT_SCROLL_BY_PIXELS)}
-                onLeftWinkAction={() => scrollOnWinkAction(-DEFAULT_SCROLL_BY_PIXELS)}
+                onRightWinkAction={() => scrollOnWinkAction(scrollByPixelsCount)}
+                onLeftWinkAction={() => scrollOnWinkAction(-scrollByPixelsCount)}
             />
             <p>
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras auctor sodales tempus. Sed ante
